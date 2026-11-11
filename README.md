@@ -78,7 +78,8 @@ pip install -r requirements.txt
 
 defaultwatch synth --out data/raw --loans 5000          # synthetic files + SYNTHETIC_DATA.txt marker
 defaultwatch all --no-mlflow                            # prepare + train
-pytest                                                  # 16 tests
+pytest                                                  # 19 tests
+defaultwatch dashboard                                  # explore the outputs (or: dashboard --demo)
 ```
 
 Delete `data/raw/*`, `data/processed/*`, `reports/` and `models/*.joblib` before the real run.
@@ -160,6 +161,28 @@ A vintage only needs its origination file, so monitoring works long before outco
 
 Once a vintage's 24-month window closes, its AUC and observed ÷ predicted default are added to the same report.
 
+## Dashboard
+
+```bash
+defaultwatch dashboard          # the outputs of your last `defaultwatch train`
+defaultwatch dashboard --demo   # builds SYNTHETIC outputs under demo/ first, then opens them
+```
+
+This opens a Streamlit app at http://localhost:8650, or the next free port if that one is taken
+(`--port` picks another). It reads `reports/` and the saved model and has six tabs:
+
+| Tab | What it shows |
+|---|---|
+| Overview | the four headline measures and a scorecard vs. gradient boosting comparison |
+| Validation | out-of-time ROC, calibration by decile, approval rate vs. default rate |
+| Stress test | 2019 predicted vs. observed default, with relief separated from real default |
+| Monitoring | score PSI by vintage, a feature-by-vintage PSI heatmap, and alerts |
+| Reason codes | how often each factor is cited, faithfulness, and scorecard points by bin |
+| Score a loan | live PD, decision and principal reasons for an application you enter, plus a what-if curve |
+
+Charts are interactive and adapt to light or dark mode, and each has a table view. Outputs built from
+synthetic data carry a warning banner.
+
 ## Repo layout
 
 ```
@@ -175,10 +198,11 @@ src/defaultwatch/
   pipeline.py               train / stress test / monitor orchestration
   tracking.py, mlflow_model.py   MLflow logging, pyfunc wrapper, Unity Catalog registration
   api.py                    FastAPI service
+  dashboard.py              Streamlit dashboard (validation, stress test, monitoring, reasons, live scoring)
   report.py, plots.py       model document, results table, charts
   synth.py                  synthetic files in the Freddie Mac layout (tests and dry runs only)
 notebooks/databricks_train.py   Databricks Free Edition runbook
-tests/                      target edge cases, monotonicity, SHAP additivity, PSI, pipeline, API
+tests/                      target edge cases, monotonicity, SHAP additivity, PSI, pipeline, API, dashboard
 ```
 
 ## Limitations

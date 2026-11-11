@@ -7,6 +7,9 @@ data/processed/*
 models/*
 !models/.gitkeep
 
+# Synthetic demo outputs built by `defaultwatch dashboard --demo`
+demo/
+
 # MLflow local store
 mlruns/
 mlflow.db

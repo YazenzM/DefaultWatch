@@ -282,6 +282,7 @@ def train(cfg: dict, use_mlflow: bool = True, make_plots: bool = True) -> dict:
         },
         "models": results,
         "auc_gain_gbm_vs_scorecard": gain,
+        "champion_rule_gain": cfg["champion"]["min_auc_gain"],
         "target_bad_rate": target_bad_rate,
         "decision_cutoff": {"pd_cutoff": float(pd_cutoff), "holdout": cutoff_info},
         "scorecard": {"selected": scorecard.selected, "dropped": scorecard.dropped,

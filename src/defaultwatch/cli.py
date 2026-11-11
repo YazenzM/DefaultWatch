@@ -18,6 +18,40 @@ def _setup_logging(verbose: bool) -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
+def free_port(preferred: int, attempts: int = 50) -> int:
+    """The preferred port if nothing is listening on it, otherwise the next free one."""
+    import socket
+
+    for port in range(preferred, preferred + attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(("127.0.0.1", port)) != 0:
+                return port
+    raise RuntimeError(f"No free port between {preferred} and {preferred + attempts - 1}")
+
+
+def build_demo(rebuild: bool = False, loans: int = 8000) -> Path:
+    """Synthetic data -> prepare -> train under demo/, so the dashboard has something to show."""
+    import yaml
+
+    from .config import REPO_ROOT
+    from .ingest import prepare
+    from .pipeline import train
+    from .synth import generate
+
+    base = REPO_ROOT / "demo"
+    cfg_path = base / "config.yaml"
+    names = {"raw_dir": "raw", "processed_dir": "processed", "reports_dir": "reports", "model_dir": "models",
+             "docs_dir": "docs"}
+    cfg = load_config(overrides={"paths": {k: str(base / v) for k, v in names.items()}})
+    if rebuild or not (Path(cfg["paths"]["reports_dir"]) / "metrics.json").exists():
+        logging.getLogger(__name__).info("building SYNTHETIC demo outputs under %s", base)
+        generate(cfg["paths"]["raw_dir"], loans_per_vintage=loans)
+        prepare(cfg)
+        train(cfg, use_mlflow=False)
+    cfg_path.write_text(yaml.safe_dump(cfg))
+    return cfg_path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="defaultwatch", description=__doc__)
     parser.add_argument("--config", default=None, help="path to config.yaml (default: config/config.yaml)")
@@ -47,6 +81,13 @@ def main(argv: list[str] | None = None) -> int:
 
     a = sub.add_parser("all", help="prepare + train")
     a.add_argument("--no-mlflow", action="store_true")
+
+    d = sub.add_parser("dashboard", help="open the Streamlit dashboard on the latest outputs")
+    d.add_argument("--demo", action="store_true", help="build SYNTHETIC outputs under demo/ (once) and show those")
+    d.add_argument("--rebuild", action="store_true", help="with --demo: regenerate the demo outputs")
+    d.add_argument("--port", type=int, default=8650, help="preferred port; the next free one is used if taken")
+    d.add_argument("--host", default="localhost",
+                   help="address to listen on (default: this machine only; 0.0.0.0 exposes it to the network)")
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)
@@ -92,6 +133,25 @@ def main(argv: list[str] | None = None) -> int:
 
         print(write_model_document(cfg))
         return 0
+
+    if args.command == "dashboard":
+        import os
+        import subprocess
+
+        from .config import DEFAULT_CONFIG
+
+        cfg_path = Path(args.config) if args.config else DEFAULT_CONFIG
+        if args.demo:
+            cfg_path = build_demo(rebuild=args.rebuild)
+        env = {**os.environ, "DEFAULTWATCH_CONFIG": str(Path(cfg_path).resolve())}
+        script = Path(__file__).with_name("dashboard.py")
+        port = free_port(args.port)
+        if port != args.port:
+            print(f"Port {args.port} is in use; using {port}.")
+        print(f"DefaultWatch dashboard: http://localhost:{port}")
+        return subprocess.call([sys.executable, "-m", "streamlit", "run", str(script),
+                                "--server.port", str(port), "--server.address", args.host,
+                                "--browser.gatherUsageStats", "false"], env=env)
 
     if args.command == "serve":
         import os
