@@ -1,0 +1,97 @@
+# DefaultWatch configuration. Paths are relative to the repo root unless absolute.
+
+paths:
+  raw_dir: data/raw              # Freddie Mac sample files (sample_YYYY.zip or extracted .txt) -- never committed
+  processed_dir: data/processed  # loan-level parquet built by `defaultwatch prepare`
+  reports_dir: reports           # metrics, tables and figures written by `train` / `monitor`
+  model_dir: models              # serialized model bundle served by the API
+  docs_dir: docs                 # generated model document
+
+vintages:
+  train: [2014, 2015, 2016]      # in-time development sample
+  oot: 2017                      # out-of-time test; 24-month windows close before COVID relief
+  stress: 2019                   # stress test; window overlaps COVID forbearance
+  monitor: [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]  # scored if the files are present
+
+target:
+  dpd_threshold: 3               # delinquency status >= 3 (90+ days) or "RA" (REO acquisition)
+  window_months: 24              # months 0..23 counted from the first payment date
+  default_zero_balance_codes: ["02", "03", "09", "15"]  # third-party sale, short sale/charge-off, REO disposition, NPL sale
+  relief_lookback_months: 3      # a 90+ month is "relief" if a relief flag appears in this month or the 3 before it
+  covid_relief_start: "2020-03"  # OOT windows must close before this month
+
+features:
+  # Application-time attributes of the borrower's credit, the loan terms and the collateral.
+  numeric: [credit_score, orig_dti, orig_ltv, orig_cltv, orig_loan_term, num_units]
+  categorical: [loan_purpose, occupancy_status, property_type]
+  # +1 = risk can only rise with the value, -1 = risk can only fall. Enforced in the GBM and in scorecard binning.
+  monotone:
+    credit_score: -1
+    orig_dti: 1
+    orig_ltv: 1
+    orig_cltv: 1
+    orig_loan_term: 1
+  # Fields available in the file but kept out of the decision model, with the reason recorded in the model document.
+  excluded:
+    property_state: "Geography; a redlining risk and not a reason a borrower can act on"
+    msa: "Geography; same concern as state"
+    postal_code: "Geography; same concern as state"
+    num_borrowers: "Proxy for marital status, a prohibited basis under ECOA"
+    first_time_homebuyer: "Correlates with applicant age, a prohibited basis under ECOA"
+    orig_interest_rate: "Output of risk-based pricing rather than an applicant attribute; not a valid adverse-action reason"
+    mi_pct: "Set mechanically by LTV and term; duplicates LTV"
+    orig_upb: "Small-balance effect proxies neighborhood income; kept out pending a fair-lending review"
+    channel: "Lender origination channel, not an attribute of the applicant"
+    seller_name: "Lender identity, not an attribute of the applicant"
+    servicer_name: "Lender identity, not an attribute of the applicant"
+    property_valuation_method: "Populated only for recent vintages"
+    program_indicator: "Populated only for recent vintages"
+
+split:
+  holdout_fraction: 0.20         # stratified in-time holdout for early stopping, Platt calibration and cutoff setting
+  random_state: 42
+
+scorecard:
+  max_bins: 10
+  min_bin_fraction: 0.05         # bins smaller than this are merged into a neighbor
+  rare_category_fraction: 0.01   # categories smaller than this are pooled into "Other"
+  pdo: 20                        # points to double the odds
+  base_score: 600
+  base_odds: 50                  # good:bad odds at the base score
+  C: 1.0                         # inverse L2 strength for the logistic regression
+
+gbm:
+  n_estimators: 3000
+  learning_rate: 0.02
+  num_leaves: 15
+  min_child_samples: 300
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.9
+  reg_lambda: 5.0
+  early_stopping_rounds: 200
+
+champion:
+  min_auc_gain: 0.005            # GBM must beat the scorecard by this much out-of-time to be preferred
+
+reasons:
+  top_n: 4
+
+approval:
+  # Approval rate is measured at a fixed default rate among approved loans.
+  # Set target_bad_rate to an absolute value (e.g. 0.004) once you have seen the real base rate;
+  # when null it is target_bad_rate_ratio x the training default rate.
+  target_bad_rate: null
+  target_bad_rate_ratio: 0.5
+
+monitoring:
+  psi_bins: 10
+  psi_warn: 0.10
+  psi_alert: 0.25
+  top_features: 5
+
+mlflow:
+  experiment: defaultwatch                    # becomes /Shared/defaultwatch on Databricks
+  registered_model_local: defaultwatch_pd
+  registered_model_uc: workspace.default.defaultwatch_pd   # Unity Catalog name on Databricks Free Edition
+  alias: champion

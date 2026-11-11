@@ -1,0 +1,13 @@
+# Runtime for the scoring API (Docker image). Pinned to the versions the model bundle was trained with:
+# a joblib bundle must be loaded with the same scikit-learn / LightGBM / pandas it was saved with.
+numpy==2.5.4
+pandas==3.1.1
+pyarrow==26.0.1
+scikit-learn==1.9.1
+scipy==1.18.1
+lightgbm==4.7.0
+joblib==1.6.0
+PyYAML==6.0.3
+fastapi==0.162.4
+uvicorn==0.54.0
+pydantic==2.14.3

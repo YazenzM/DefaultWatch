@@ -1,0 +1,27 @@
+# Freddie Mac terms restrict redistribution: raw files, anything derived at loan level,
+# and models fit to them stay local. Only code and aggregate results are published.
+data/raw/*
+data/processed/*
+!data/raw/README.md
+!data/**/.gitkeep
+models/*
+!models/.gitkeep
+
+# MLflow local store
+mlruns/
+mlflow.db
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
