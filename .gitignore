@@ -10,6 +10,9 @@ models/*
 # Synthetic demo outputs built by `defaultwatch dashboard --demo`
 demo/
 
+# Working outputs of `defaultwatch train`; `defaultwatch publish` copies the aggregate ones to results/
+reports/
+
 # MLflow local store
 mlruns/
 mlflow.db

@@ -1,0 +1,110 @@
+approval:
+  target_bad_rate: null
+  target_bad_rate_ratio: 0.5
+champion:
+  min_auc_gain: 0.005
+features:
+  categorical:
+  - loan_purpose
+  - occupancy_status
+  - property_type
+  excluded:
+    channel: Lender origination channel, not an attribute of the applicant
+    first_time_homebuyer: Correlates with applicant age, a prohibited basis under
+      ECOA
+    mi_pct: Set mechanically by LTV and term; duplicates LTV
+    msa: Geography; same concern as state
+    num_borrowers: Proxy for marital status, a prohibited basis under ECOA
+    orig_interest_rate: Output of risk-based pricing rather than an applicant attribute;
+      not a valid adverse-action reason
+    orig_upb: Small-balance effect proxies neighborhood income; kept out pending a
+      fair-lending review
+    postal_code: Geography; same concern as state
+    program_indicator: Populated only for recent vintages
+    property_state: Geography; a redlining risk and not a reason a borrower can act
+      on
+    property_valuation_method: Populated only for recent vintages
+    seller_name: Lender identity, not an attribute of the applicant
+    servicer_name: Lender identity, not an attribute of the applicant
+    vantage_score_4: Added in Release 48 but not populated (9999) for any 2014-2025
+      sample loan
+  monotone:
+    credit_score: -1
+    orig_cltv: 1
+    orig_dti: 1
+    orig_loan_term: 1
+    orig_ltv: 1
+  numeric:
+  - credit_score
+  - orig_dti
+  - orig_ltv
+  - orig_cltv
+  - orig_loan_term
+  - num_units
+gbm:
+  colsample_bytree: 0.9
+  early_stopping_rounds: 200
+  learning_rate: 0.02
+  min_child_samples: 300
+  n_estimators: 3000
+  num_leaves: 15
+  reg_lambda: 5.0
+  subsample: 0.8
+  subsample_freq: 1
+mlflow:
+  alias: champion
+  experiment: defaultwatch
+  registered_model_local: defaultwatch_pd
+  registered_model_uc: workspace.default.defaultwatch_pd
+monitoring:
+  min_complete_share: 0.95
+  psi_alert: 0.25
+  psi_bins: 10
+  psi_warn: 0.1
+  top_features: 5
+paths:
+  docs_dir: docs
+  model_dir: results/models
+  processed_dir: data/processed
+  raw_dir: data/raw
+  reports_dir: results/reports
+reasons:
+  top_n: 4
+scorecard:
+  C: 1.0
+  base_odds: 50
+  base_score: 600
+  max_bins: 10
+  min_bin_fraction: 0.05
+  pdo: 20
+  rare_category_fraction: 0.01
+split:
+  holdout_fraction: 0.2
+  random_state: 42
+target:
+  covid_relief_start: 2020-03
+  default_zero_balance_codes:
+  - '02'
+  - '03'
+  - 09
+  - '15'
+  dpd_threshold: 3
+  relief_lookback_months: 3
+  window_months: 24
+vintages:
+  monitor:
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+  oot: 2017
+  stress: 2019
+  train:
+  - 2014
+  - 2015
+  - 2016

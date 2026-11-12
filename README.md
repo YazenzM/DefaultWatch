@@ -7,15 +7,29 @@ Training is tracked and registered with MLflow on Databricks, and scores are ser
 
 ## Results
 
-| Measure | Scorecard | Gradient boosting |
-|---|---|---|
-| Out-of-time AUC (2017) | _pending real-data run_ | |
-| Calibration error by decile (2017) | | |
-| Approval rate at a fixed default rate (2017) | | |
-| PSI of 2019 vs. training scores | | |
+These results come from the Freddie Mac Single-Family Loan-Level Dataset sample files (Release 48), 50,000
+loans per vintage. Training used 2014–2016 (147,616 loans), the out-of-time test used 2017 and the stress test
+used 2019.
 
-Run the pipeline on the Freddie Mac files and paste `reports/results.md` here. The full write-up is generated
-at [docs/model_document.md](docs/model_document.md).
+| Measure | Scorecard (champion) | Gradient boosting |
+|---|---|---|
+| Out-of-time AUC (2017) | 0.775 | 0.777 |
+| Calibration error by decile (2017) | 0.26% | 0.21% |
+| Approval rate at a 0.28% default rate (2017) | 61.8% | 68.1% |
+| PSI of 2019 vs. training scores | 0.010 (stable) | |
+
+What the run shows:
+- **The scorecard stays champion.** Gradient boosting adds only 0.002 AUC, below the 0.005 a less transparent
+  model must gain to replace it.
+- **Most 2019 defaults were relief.** 4.59% of 2019 loans reached 90+ days, but 93.5% of those cases were COVID
+  relief. The real default rate was 0.30%, against 0.49% predicted.
+- **The 2017 gap is the hurricanes.** All-cause observed ÷ predicted is 1.43 in 2017. Excluding relief from
+  Harvey, Irma and Maria, it is 0.91.
+- **Monitoring caught a real shift.** Loans with DTI above 45% grew from 5% of 2014 originations to 26% of
+  2023's. Feature PSI alerts on DTI from 2018 on, while score PSI stays below 0.10.
+- **2022–2023 need recalibration.** Excluding relief, these vintages default at about twice the predicted rate.
+
+The full write-up is [docs/model_document.md](docs/model_document.md).
 
 ## How it works
 
@@ -78,7 +92,7 @@ pip install -r requirements.txt
 
 defaultwatch synth --out data/raw --loans 5000          # synthetic files + SYNTHETIC_DATA.txt marker
 defaultwatch all --no-mlflow                            # prepare + train
-pytest                                                  # 21 tests
+pytest                                                  # 22 tests
 defaultwatch dashboard                                  # explore the outputs (or: dashboard --demo)
 ```
 
