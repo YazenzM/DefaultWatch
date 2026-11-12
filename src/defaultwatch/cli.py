@@ -29,8 +29,9 @@ def free_port(preferred: int, attempts: int = 50) -> int:
     raise RuntimeError(f"No free port between {preferred} and {preferred + attempts - 1}")
 
 
-def build_demo(rebuild: bool = False, loans: int = 8000) -> Path:
-    """Synthetic data -> prepare -> train under demo/, so the dashboard has something to show."""
+def build_demo(rebuild: bool = False, loans: int = 8000, base: Path | None = None,
+               make_plots: bool = True) -> Path:
+    """Synthetic data -> prepare -> train under demo/ (or `base`), so the dashboard has something to show."""
     import yaml
 
     from .config import REPO_ROOT
@@ -38,7 +39,7 @@ def build_demo(rebuild: bool = False, loans: int = 8000) -> Path:
     from .pipeline import train
     from .synth import generate
 
-    base = REPO_ROOT / "demo"
+    base = Path(base) if base else REPO_ROOT / "demo"
     cfg_path = base / "config.yaml"
     names = {"raw_dir": "raw", "processed_dir": "processed", "reports_dir": "reports", "model_dir": "models",
              "docs_dir": "docs"}
@@ -47,7 +48,7 @@ def build_demo(rebuild: bool = False, loans: int = 8000) -> Path:
         logging.getLogger(__name__).info("building SYNTHETIC demo outputs under %s", base)
         generate(cfg["paths"]["raw_dir"], loans_per_vintage=loans)
         prepare(cfg)
-        train(cfg, use_mlflow=False)
+        train(cfg, use_mlflow=False, make_plots=make_plots)
     cfg_path.write_text(yaml.safe_dump(cfg))
     return cfg_path
 

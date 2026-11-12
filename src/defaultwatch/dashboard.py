@@ -552,4 +552,5 @@ def main() -> None:
         score_tab(bundle)
 
 
-main()
+if __name__ == "__main__":   # `streamlit run dashboard.py`; app/streamlit_app.py imports main() instead
+    main()

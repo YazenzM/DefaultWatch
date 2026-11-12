@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 defaultwatch synth --out data/raw --loans 5000          # synthetic files + SYNTHETIC_DATA.txt marker
 defaultwatch all --no-mlflow                            # prepare + train
-pytest                                                  # 19 tests
+pytest                                                  # 20 tests
 defaultwatch dashboard                                  # explore the outputs (or: dashboard --demo)
 ```
 
@@ -183,6 +183,23 @@ This opens a Streamlit app at http://localhost:8650, or the next free port if th
 Charts are interactive and adapt to light or dark mode, and each has a table view. Outputs built from
 synthetic data carry a warning banner.
 
+### Hosted demo (Streamlit Community Cloud)
+
+[app/streamlit_app.py](app/streamlit_app.py) runs the same dashboard as a public demo. The Freddie Mac
+files can't be redistributed and fitted models aren't in git, so the hosted app builds its own outputs on first
+start. It generates synthetic loans, trains both models (about a minute) and keeps them until the app restarts.
+The demo always shows synthetic results.
+
+To deploy, sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub and choose
+**Create app → Deploy a public app from GitHub**:
+- **Repository and branch:** this repo, `main`
+- **Main file path:** `app/streamlit_app.py`
+- **App URL:** pick your own name
+- **Python:** 3.12, under **Advanced settings**
+
+The cloud installs [app/requirements.txt](app/requirements.txt), a light list without MLflow or the test
+tools, plus `libgomp1` from [packages.txt](packages.txt) for LightGBM.
+
 ## Repo layout
 
 ```
@@ -201,6 +218,7 @@ src/defaultwatch/
   dashboard.py              Streamlit dashboard (validation, stress test, monitoring, reasons, live scoring)
   report.py, plots.py       model document, results table, charts
   synth.py                  synthetic files in the Freddie Mac layout (tests and dry runs only)
+app/streamlit_app.py        hosted demo entry point (Streamlit Community Cloud); app/requirements.txt
 notebooks/databricks_train.py   Databricks Free Edition runbook
 tests/                      target edge cases, monotonicity, SHAP additivity, PSI, pipeline, API, dashboard
 ```

@@ -46,6 +46,19 @@ def test_score_tab_reacts_to_inputs(trained, monkeypatch):
     assert any(m.value.startswith("1. ") for m in at.markdown)  # numbered principal reasons
 
 
+def test_hosted_demo_builds_on_first_start(tmp_path, monkeypatch):
+    """app/streamlit_app.py (Streamlit Community Cloud) starts with no outputs and must build its own."""
+    monkeypatch.setenv("DEFAULTWATCH_DEMO_DIR", str(tmp_path / "demo"))
+    monkeypatch.setenv("DEFAULTWATCH_DEMO_LOANS", "2000")
+    monkeypatch.delenv("DEFAULTWATCH_CONFIG", raising=False)
+    entry = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
+    at = AppTest.from_file(str(entry), default_timeout=300).run()
+    assert not at.exception, at.exception
+    assert [t.label for t in at.tabs] == TABS
+    assert any("Synthetic data" in w.value for w in at.warning)
+    assert (tmp_path / "demo" / "models" / "defaultwatch_bundle.joblib").exists()
+
+
 def test_dashboard_without_outputs(tmp_path, monkeypatch):
     cfg = make_config(tmp_path)
     path = tmp_path / "config.yaml"

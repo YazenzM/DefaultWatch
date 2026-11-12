@@ -1,0 +1,13 @@
+# Streamlit Community Cloud reads this file (it sits next to streamlit_app.py) instead of the root
+# requirements.txt, so the hosted demo skips MLflow, FastAPI and the test tools.
+# The defaultwatch package is loaded from ../src. Keep versions in step with requirements-serve.txt.
+numpy==2.5.4
+pandas==3.1.1
+pyarrow==26.0.1
+scikit-learn==1.9.1
+scipy==1.18.1
+lightgbm==4.7.0
+joblib==1.6.0
+PyYAML==6.0.3
+streamlit==1.67.0
+plotly==7.1.0
