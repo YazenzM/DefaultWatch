@@ -1,0 +1,10 @@
+feature,share_of_declines_citing,share_as_top_reason
+credit_score,1.0,0.9925
+orig_dti,0.994,0.0075
+orig_ltv,0.959,0.0
+orig_cltv,0.959,0.0
+orig_loan_term,0.044,0.0
+num_units,0.0,0.0
+loan_purpose,0.0065,0.0
+occupancy_status,0.0375,0.0
+property_type,0.0,0.0

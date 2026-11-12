@@ -1,0 +1,61 @@
+{
+  "score_psi": 0.030035976546955615,
+  "score_status": "stable",
+  "feature_psi": {
+    "credit_score": 0.008531784114600746,
+    "orig_dti": 0.9446305483222919,
+    "orig_ltv": 0.13786100144913016,
+    "orig_cltv": 0.08884472399161077,
+    "orig_loan_term": 0.25943126439914815,
+    "num_units": 8.031213842496671e-07,
+    "loan_purpose": 0.9205315808956107,
+    "occupancy_status": 0.010272583659041507,
+    "property_type": 0.029557897390615463
+  },
+  "feature_status": {
+    "credit_score": "stable",
+    "orig_dti": "alert",
+    "orig_ltv": "watch",
+    "orig_cltv": "stable",
+    "orig_loan_term": "alert",
+    "num_units": "stable",
+    "loan_purpose": "alert",
+    "occupancy_status": "stable",
+    "property_type": "stable"
+  },
+  "top_features": [
+    "credit_score",
+    "orig_dti",
+    "orig_cltv",
+    "orig_ltv",
+    "orig_loan_term"
+  ],
+  "max_watched_psi": 0.9446305483222919,
+  "status": "alert",
+  "alerts": [
+    "orig_dti",
+    "orig_loan_term"
+  ],
+  "warnings": [
+    "orig_ltv"
+  ],
+  "thresholds": {
+    "watch": 0.1,
+    "alert": 0.25
+  },
+  "baseline": "2014-2016 development sample",
+  "vintage": 2023,
+  "n": 50000,
+  "mean_pd": 0.0054501701181400245,
+  "complete_share": 0.99808,
+  "outcomes": {
+    "n_complete": 49904,
+    "observed_rate": 0.017533664636101315,
+    "observed_real_rate": 0.011462007053542802,
+    "mean_pd_complete": 0.005455014989773335,
+    "observed_to_predicted": 3.2142284978083753,
+    "observed_real_to_predicted": 2.1011870865673035,
+    "auc": 0.7817030853459905,
+    "auc_real": 0.7834125100149182
+  }
+}

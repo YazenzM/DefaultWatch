@@ -11,7 +11,7 @@ models/*
 demo/
 
 # Working outputs of `defaultwatch train`; `defaultwatch publish` copies the aggregate ones to results/
-reports/
+/reports/
 
 # MLflow local store
 mlruns/

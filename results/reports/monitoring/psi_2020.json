@@ -1,0 +1,58 @@
+{
+  "score_psi": 0.09035679396445329,
+  "score_status": "stable",
+  "feature_psi": {
+    "credit_score": 0.04881354521758672,
+    "orig_dti": 0.6714893098199912,
+    "orig_ltv": 0.07331906667902592,
+    "orig_cltv": 0.07543463186980769,
+    "orig_loan_term": 0.003631942295589999,
+    "num_units": 0.0010165080354169814,
+    "loan_purpose": 0.12919795667269682,
+    "occupancy_status": 0.024251344702333852,
+    "property_type": 0.0026744849681409706
+  },
+  "feature_status": {
+    "credit_score": "stable",
+    "orig_dti": "alert",
+    "orig_ltv": "stable",
+    "orig_cltv": "stable",
+    "orig_loan_term": "stable",
+    "num_units": "stable",
+    "loan_purpose": "watch",
+    "occupancy_status": "stable",
+    "property_type": "stable"
+  },
+  "top_features": [
+    "credit_score",
+    "orig_dti",
+    "orig_cltv",
+    "orig_ltv",
+    "orig_loan_term"
+  ],
+  "max_watched_psi": 0.6714893098199912,
+  "status": "alert",
+  "alerts": [
+    "orig_dti"
+  ],
+  "warnings": [],
+  "thresholds": {
+    "watch": 0.1,
+    "alert": 0.25
+  },
+  "baseline": "2014-2016 development sample",
+  "vintage": 2020,
+  "n": 50000,
+  "mean_pd": 0.0037747859109894693,
+  "complete_share": 0.9997,
+  "outcomes": {
+    "n_complete": 49985,
+    "observed_rate": 0.016204861458437532,
+    "observed_real_rate": 0.002240672201660498,
+    "mean_pd_complete": 0.003775284175470025,
+    "observed_to_predicted": 4.29235541094599,
+    "observed_real_to_predicted": 0.5935108716369764,
+    "auc": 0.7221754755942182,
+    "auc_real": 0.6458744496735995
+  }
+}
