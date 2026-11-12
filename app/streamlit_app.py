@@ -1,8 +1,9 @@
 """Entry point for the hosted demo on Streamlit Community Cloud.
 
-The Freddie Mac files cannot be redistributed and fitted models are kept out of git, so the hosted app
-starts empty. On its first start it generates SYNTHETIC loans in the Freddie Mac layout, trains both
-models on them and then shows the normal dashboard. On your own machine, use `defaultwatch dashboard`.
+The Freddie Mac files cannot be redistributed and fitted models are kept out of git. If `results/` holds
+the aggregate results of a Freddie Mac run (`defaultwatch publish`), the app shows those. Otherwise, on its
+first start it generates SYNTHETIC loans in the Freddie Mac layout, trains both models on them and shows
+those. On your own machine, use `defaultwatch dashboard`.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))   # the package is used from source; no pi
 
 import streamlit as st  # noqa: E402
 
+RESULTS_DIR = Path(os.getenv("DEFAULTWATCH_RESULTS_DIR") or ROOT / "results")
 DEMO_DIR = Path(os.getenv("DEFAULTWATCH_DEMO_DIR") or Path(tempfile.gettempdir()) / "defaultwatch_demo")
 LOANS_PER_VINTAGE = int(os.getenv("DEFAULTWATCH_DEMO_LOANS", "8000"))
 
@@ -31,7 +33,8 @@ def demo_config() -> str:
     return str(build_demo(loans=LOANS_PER_VINTAGE, base=DEMO_DIR, make_plots=False))
 
 
-os.environ["DEFAULTWATCH_CONFIG"] = demo_config()
+published = RESULTS_DIR / "config.yaml"
+os.environ["DEFAULTWATCH_CONFIG"] = str(published) if published.exists() else demo_config()
 
 from defaultwatch.dashboard import main  # noqa: E402
 

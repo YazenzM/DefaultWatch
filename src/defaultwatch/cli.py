@@ -1,4 +1,4 @@
-"""Command line: defaultwatch {synth,prepare,train,monitor,report,serve,all}."""
+"""Command line: defaultwatch {synth,prepare,train,monitor,report,publish,serve,all,dashboard}."""
 
 from __future__ import annotations
 
@@ -53,6 +53,50 @@ def build_demo(rebuild: bool = False, loans: int = 8000, base: Path | None = Non
     return cfg_path
 
 
+# Aggregate outputs only: deciles, curve points, score bins, PSI values. No loan-level rows, no fitted model.
+PUBLISHED_REPORTS = ["metrics.json", "results.md", "roc_oot.csv", "calibration_oot_*.csv", "approval_curve_oot.csv",
+                     "outcome_breakdown.csv", "reason_frequency_oot.csv", "scorecard_points.csv",
+                     "monitoring/psi_summary.csv", "monitoring/psi_*.json", "figures/*.png"]
+
+
+def publish_results(cfg: dict, dest: str | Path | None = None, allow_synthetic: bool = False) -> Path:
+    """Copy the aggregate results of a Freddie Mac run to results/, which the hosted demo shows.
+
+    The Freddie Mac terms allow publishing results, not the data. Only the files in PUBLISHED_REPORTS are
+    copied; raw files, loan-level parquet and the fitted model stay local (see .gitignore).
+    """
+    import shutil
+
+    import yaml
+
+    from .config import REPO_ROOT
+
+    src = Path(cfg["paths"]["reports_dir"])
+    metrics = src / "metrics.json"
+    if not metrics.exists():
+        raise FileNotFoundError(f"No metrics.json in {src}. Run `defaultwatch train` first.")
+    if json.loads(metrics.read_text()).get("synthetic_data") and not allow_synthetic:
+        raise ValueError("These outputs were built from SYNTHETIC data. Train on the Freddie Mac files first.")
+
+    dest = Path(dest).resolve() if dest else REPO_ROOT / "results"
+    reports = dest / "reports"
+    shutil.rmtree(reports, ignore_errors=True)
+    for pattern in PUBLISHED_REPORTS:
+        for f in sorted(src.glob(pattern)):
+            target = reports / f.relative_to(src)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, target)
+
+    def portable(p: Path) -> str:   # repo-relative where possible, so the config works on any machine
+        p = Path(p).resolve()
+        return p.relative_to(REPO_ROOT).as_posix() if p.is_relative_to(REPO_ROOT) else str(p)
+
+    out_cfg = {**cfg, "paths": {k: portable(v) for k, v in cfg["paths"].items()}}
+    out_cfg["paths"].update(reports_dir=portable(reports), model_dir=portable(dest / "models"))
+    (dest / "config.yaml").write_text(yaml.safe_dump(out_cfg))
+    return dest
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="defaultwatch", description=__doc__)
     parser.add_argument("--config", default=None, help="path to config.yaml (default: config/config.yaml)")
@@ -75,6 +119,10 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--fail-on-alert", action="store_true", help="exit with code 2 if any PSI alert fires")
 
     sub.add_parser("report", help="re-render docs/model_document.md from reports/metrics.json")
+
+    p = sub.add_parser("publish", help="copy aggregate results (no loan-level data, no model) to results/ "
+                                       "for the hosted demo")
+    p.add_argument("--out", default=None, help="destination folder (default: results/)")
 
     v = sub.add_parser("serve", help="run the FastAPI scoring service")
     v.add_argument("--host", default="127.0.0.1")
@@ -133,6 +181,16 @@ def main(argv: list[str] | None = None) -> int:
         from .report import write_model_document
 
         print(write_model_document(cfg))
+        return 0
+
+    if args.command == "publish":
+        try:
+            out = publish_results(cfg, args.out)
+        except (FileNotFoundError, ValueError) as e:
+            print(e, file=sys.stderr)
+            return 1
+        print(f"Aggregate results copied to {out}. Review them, then commit results/ and push; "
+              "the hosted demo shows them instead of synthetic data.")
         return 0
 
     if args.command == "dashboard":

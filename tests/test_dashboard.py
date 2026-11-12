@@ -1,3 +1,4 @@
+from fnmatch import fnmatch
 from pathlib import Path
 
 import pytest
@@ -46,17 +47,41 @@ def test_score_tab_reacts_to_inputs(trained, monkeypatch):
     assert any(m.value.startswith("1. ") for m in at.markdown)  # numbered principal reasons
 
 
+ENTRY = str(Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py")
+
+
 def test_hosted_demo_builds_on_first_start(tmp_path, monkeypatch):
     """app/streamlit_app.py (Streamlit Community Cloud) starts with no outputs and must build its own."""
+    monkeypatch.setenv("DEFAULTWATCH_RESULTS_DIR", str(tmp_path / "no_results"))
     monkeypatch.setenv("DEFAULTWATCH_DEMO_DIR", str(tmp_path / "demo"))
     monkeypatch.setenv("DEFAULTWATCH_DEMO_LOANS", "2000")
     monkeypatch.delenv("DEFAULTWATCH_CONFIG", raising=False)
-    entry = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
-    at = AppTest.from_file(str(entry), default_timeout=300).run()
+    at = AppTest.from_file(ENTRY, default_timeout=300).run()
     assert not at.exception, at.exception
     assert [t.label for t in at.tabs] == TABS
     assert any("Synthetic data" in w.value for w in at.warning)
     assert (tmp_path / "demo" / "models" / "defaultwatch_bundle.joblib").exists()
+
+
+def test_publish_copies_only_aggregates_and_hosted_demo_uses_them(trained, tmp_path, monkeypatch):
+    from defaultwatch.cli import PUBLISHED_REPORTS, publish_results
+
+    with pytest.raises(ValueError, match="SYNTHETIC"):
+        publish_results(trained["cfg"], tmp_path / "results")
+    dest = publish_results(trained["cfg"], tmp_path / "results", allow_synthetic=True)
+    files = [p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file()]
+    assert {"config.yaml", "reports/metrics.json", "reports/monitoring/psi_summary.csv"} <= set(files)
+    allowed = ["config.yaml"] + [f"reports/{pattern}" for pattern in PUBLISHED_REPORTS]
+    assert all(any(fnmatch(f, a) for a in allowed) for f in files), files   # no model, no loan-level data
+
+    monkeypatch.setenv("DEFAULTWATCH_RESULTS_DIR", str(dest))
+    monkeypatch.setenv("DEFAULTWATCH_DEMO_DIR", str(tmp_path / "demo"))
+    monkeypatch.delenv("DEFAULTWATCH_CONFIG", raising=False)
+    at = AppTest.from_file(ENTRY, default_timeout=120).run()
+    assert not at.exception, at.exception
+    assert [t.label for t in at.tabs] == TABS
+    assert not (tmp_path / "demo").exists()                       # shown from results/, nothing rebuilt
+    assert any("No fitted model" in i.value for i in at.info)     # live scoring stays local
 
 
 def test_dashboard_without_outputs(tmp_path, monkeypatch):

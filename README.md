@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 defaultwatch synth --out data/raw --loans 5000          # synthetic files + SYNTHETIC_DATA.txt marker
 defaultwatch all --no-mlflow                            # prepare + train
-pytest                                                  # 20 tests
+pytest                                                  # 21 tests
 defaultwatch dashboard                                  # explore the outputs (or: dashboard --demo)
 ```
 
@@ -107,6 +107,16 @@ defaultwatch monitor --fail-on-alert
 
 Without Databricks credentials, MLflow logs to a local `mlflow.db`. Browse it with
 `mlflow ui --backend-store-uri sqlite:///mlflow.db`.
+
+To put the real results on the hosted demo, run the following:
+
+```bash
+defaultwatch publish            # copies aggregate results only to results/
+git add results && git commit -m "Results on Freddie Mac data" && git push
+```
+
+`publish` copies only aggregates: metrics, deciles, curve points, scorecard bins and PSI values. It never
+copies raw files, loan-level data or the fitted model, and it refuses outputs built from synthetic data.
 
 ## Databricks Free Edition
 
@@ -185,10 +195,10 @@ synthetic data carry a warning banner.
 
 ### Hosted demo (Streamlit Community Cloud)
 
-[app/streamlit_app.py](app/streamlit_app.py) runs the same dashboard as a public demo. The Freddie Mac
-files can't be redistributed and fitted models aren't in git, so the hosted app builds its own outputs on first
-start. It generates synthetic loans, trains both models (about a minute) and keeps them until the app restarts.
-The demo always shows synthetic results.
+[app/streamlit_app.py](app/streamlit_app.py) runs the same dashboard as a public demo. If `results/` holds the
+output of `defaultwatch publish`, the demo shows those Freddie Mac results. Live scoring stays local, because the
+fitted model isn't published. Otherwise, on first start the demo generates synthetic loans and trains both models
+(about a minute), then shows those outputs under a synthetic-data banner.
 
 To deploy, sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub and choose
 **Create app → Deploy a public app from GitHub**:
@@ -219,6 +229,7 @@ src/defaultwatch/
   report.py, plots.py       model document, results table, charts
   synth.py                  synthetic files in the Freddie Mac layout (tests and dry runs only)
 app/streamlit_app.py        hosted demo entry point (Streamlit Community Cloud); app/requirements.txt
+results/                    published aggregate results of a Freddie Mac run (`defaultwatch publish`)
 notebooks/databricks_train.py   Databricks Free Edition runbook
 tests/                      target edge cases, monotonicity, SHAP additivity, PSI, pipeline, API, dashboard
 ```

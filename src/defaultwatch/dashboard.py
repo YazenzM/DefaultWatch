@@ -419,7 +419,9 @@ PROPERTIES = {"SF": "Single-family", "PU": "Planned unit development", "CO": "Co
 def score_tab(bundle) -> None:
     c = theme()
     if bundle is None:
-        st.info("No model bundle found. Run `defaultwatch train` (or `defaultwatch dashboard --demo`).")
+        st.info("No fitted model here. Models trained on Freddie Mac data stay out of the public repo under the "
+                "dataset's terms, so live scoring runs locally: clone the repo, then `defaultwatch train` and "
+                "`defaultwatch dashboard` (or `defaultwatch dashboard --demo` for synthetic data).")
         return
     left, right = st.columns([2, 3], gap="large")
     with left:
