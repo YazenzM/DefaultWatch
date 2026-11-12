@@ -149,6 +149,7 @@ def _performance_lines(rng: np.random.Generator, o: dict, loan_ids: np.ndarray, 
 
         upb = 250000.0
         n_rows = end + 1 if zb_code else months
+        deferred = False
         for k in range(n_rows):
             terminal = bool(zb_code) and k == end
             row = empty.copy()
@@ -163,12 +164,18 @@ def _performance_lines(rng: np.random.Generator, o: dict, loan_ids: np.ndarray, 
             if terminal:
                 row[8] = str(zb_code)
                 row[9] = _yyyymm(fp + k)
-            if deferral[k]:
-                row[24] = "Y"
+            if deferral[k]:          # Release 48: C in the deferral month, P on every month after it
+                row[24] = "C"
+                deferred = True
+            elif deferred:
+                row[24] = "P"
             if disaster[k]:
                 row[28] = "Y"
             if assist[k]:
                 row[29] = assist[k]
+            row[31] = row[2]         # interest-bearing UPB
+            row[32] = "7"            # MI cancellation: not applicable
+            row[33] = "OTHER"        # servicer name
             lines.append("|".join(row[:ncols]))
     return lines
 
@@ -214,21 +221,20 @@ def generate(out_dir: str | Path, vintages: list[int] | None = None, loans_per_v
             row[20] = o["purpose"][i]
             row[21] = str(int(o["term"][i]))
             row[22] = str(rng.choice([1, 2], p=[0.45, 0.55]))
-            row[23] = "Other sellers"
-            row[24] = "Other servicers"
-            row[25] = ""
-            row[26] = ""
-            row[27] = "9"
-            row[28] = ""
-            row[29] = "9"
-            row[30] = "N"
-            row[31] = "7"
+            row[23] = "OTHER"        # seller name
+            row[24] = "N"            # super conforming
+            row[25] = ""             # pre-HARP loan id
+            row[26] = ""             # special eligibility program
+            row[27] = "N"            # HARP indicator
+            row[28] = "7"            # property valuation method: not available
+            row[29] = "N"            # interest only
+            row[30] = "9999"         # VantageScore 4.0: not available
             orig_rows.append("|".join(row))
         orig_text = "\n".join(orig_rows) + "\n"
         files = {f"sample_orig_{year}.txt": orig_text}
         if year not in origination_only:
-            perf =_performance_lines(rng, o, ids, year, months, len(PERFORMANCE_COLUMNS))
-            files[f"sample_svcg_{year}.txt"] = "\n".join(perf) + "\n"
+            perf = _performance_lines(rng, o, ids, year, months, len(PERFORMANCE_COLUMNS))
+            files[f"sample_perf_{year}.txt"] = "\n".join(perf) + "\n"
         if as_zip:
             with zipfile.ZipFile(out / f"sample_{year}.zip", "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 for name, text in files.items():

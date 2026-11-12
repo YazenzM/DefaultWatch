@@ -1,14 +1,20 @@
 """Freddie Mac Single-Family Loan-Level Dataset file layouts.
 
-Both files are pipe-delimited with no header row. Column order follows the
-Freddie Mac "General User Guide" for the standard dataset. Older releases have
-fewer columns; new fields have always been appended at the end, so a file with
-N columns uses the first N names below.
+Both files are pipe-delimited with no header row. Column order follows the Freddie Mac
+"General User Guide", Release 48: sample_YYYY.zip holds sample_orig_YYYY.txt and sample_perf_YYYY.txt.
+
+Release 48 changed both layouts. Servicer Name and the MI Cancellation Indicator moved from the
+origination file to the monthly performance file. VantageScore 4.0 was appended to the origination
+file and Bankruptcy Cramdown Costs to the performance file. The Payment Deferral flag became
+C (current period) / P (prior period) instead of Y.
+
+Earlier releases (performance file sample_svcg_YYYY.txt) are still read. Their origination layout
+is LEGACY_ORIGINATION_COLUMNS, and their performance layout is a prefix of PERFORMANCE_COLUMNS.
 """
 
 from __future__ import annotations
 
-ORIGINATION_COLUMNS: list[str] = [
+LEGACY_ORIGINATION_COLUMNS: list[str] = [
     "credit_score",               # 1  300-850; 9999 = not available
     "first_payment_date",         # 2  YYYYMM
     "first_time_homebuyer",       # 3  Y / N / 9
@@ -43,6 +49,33 @@ ORIGINATION_COLUMNS: list[str] = [
     "mi_cancellation",            # 32
 ]
 
+# Release 48: fields 1-24 unchanged, servicer name and MI cancellation moved to the performance file.
+ORIGINATION_COLUMNS: list[str] = LEGACY_ORIGINATION_COLUMNS[:24] + [
+    "super_conforming",           # 25 Y / N
+    "pre_harp_loan_id",           # 26
+    "program_indicator",          # 27 H / F / R; blank = not applicable
+    "harp_indicator",             # 28 Y / N
+    "property_valuation_method",  # 29 1-4; 7 = not available
+    "interest_only",              # 30 Y / N
+    "vantage_score_4",            # 31 300-850; 9999 = not available
+]
+
+
+def origination_columns(first_row: list[str]) -> list[str]:
+    """Column names for an origination file, recognised from its first row.
+
+    Release 48 has 31 fields with the Super Conforming flag (Y / N / blank) in field 25. Earlier
+    releases had the Servicer Name there and only ever appended fields, so a shorter legacy file
+    uses the first N legacy names.
+    """
+    n = len(first_row)
+    if n == len(ORIGINATION_COLUMNS) and first_row[24].strip() in {"Y", "N", ""}:
+        return ORIGINATION_COLUMNS
+    if n <= len(LEGACY_ORIGINATION_COLUMNS):
+        return LEGACY_ORIGINATION_COLUMNS[:n]
+    return ORIGINATION_COLUMNS + [f"extra_{i}" for i in range(n - len(ORIGINATION_COLUMNS))]
+
+
 PERFORMANCE_COLUMNS: list[str] = [
     "loan_id",                        # 1
     "period",                         # 2  monthly reporting period YYYYMM
@@ -68,15 +101,21 @@ PERFORMANCE_COLUMNS: list[str] = [
     "actual_loss",                    # 22
     "cumulative_mod_cost",            # 23
     "step_mod_flag",                  # 24
-    "payment_deferral",               # 25 Y = payment deferral this month
+    "payment_deferral",               # 25 C = granted this period, P = prior period (Y before Release 48)
     "eltv",                           # 26
     "zero_balance_removal_upb",       # 27
     "delinquent_accrued_interest",    # 28
     "disaster_delinquency",           # 29 Y = delinquency due to a declared disaster
     "borrower_assistance_status",     # 30 F = forbearance, R = repayment plan, T = trial modification
     "current_month_mod_cost",         # 31
-    "interest_bearing_upb",           # 32
+    "interest_bearing_upb",           # 32 (last field before Release 48)
+    "mi_cancellation",                # 33 Y / N; 7 = not applicable (moved from origination)
+    "servicer_name",                  # 34 (moved from origination)
+    "bankruptcy_cramdown_costs",      # 35
 ]
+
+# Performance-file kinds in member names: "perf" from Release 48, "svcg" before.
+PERFORMANCE_KINDS: tuple[str, ...] = ("perf", "svcg")
 
 # Performance fields the target builder needs.
 PERFORMANCE_USECOLS: list[str] = [
@@ -92,6 +131,7 @@ PERFORMANCE_USECOLS: list[str] = [
 # Sentinel codes that mean "not available" in the origination file.
 NUMERIC_SENTINELS: dict[str, set[float]] = {
     "credit_score": {9999},
+    "vantage_score_4": {9999},
     "mi_pct": {999},
     "num_units": {99},
     "orig_cltv": {999},
@@ -131,3 +171,7 @@ CATEGORY_LABELS: dict[str, dict[str, str]] = {
 }
 
 ASSISTANCE_RELIEF_CODES: set[str] = {"F", "R", "T"}
+
+# Payment deferral granted in the reporting month: C from Release 48, Y before. P (prior period) stays
+# on every later month, so it does not mark that month's delinquency as relief.
+PAYMENT_DEFERRAL_RELIEF_CODES: set[str] = {"C", "Y"}

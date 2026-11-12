@@ -359,9 +359,22 @@ def monitoring(m: dict, r: Reports, bundle) -> None:
                                 "n": st.column_config.NumberColumn("Loans", format="%d")})
     outcome_cols = [col for col in summary.columns if col.startswith("outcome_")]
     if outcome_cols:
-        st.markdown("**Outcomes where the 24-month window has closed**")
-        st.dataframe(summary[["vintage"] + outcome_cols].dropna(subset=["outcome_auc"]).rename(
-            columns=lambda col: col.replace("outcome_", "")), hide_index=True, width="stretch")
+        st.markdown("**Outcomes where the 24-month windows have closed**")
+        pct_cols = {"outcome_observed_rate": "Observed 90+", "outcome_observed_real_rate": "Observed excl. relief",
+                    "outcome_mean_pd_complete": "Mean PD"}
+        ratio_cols = {"outcome_observed_to_predicted": "Observed ÷ predicted",
+                      "outcome_observed_real_to_predicted": "Excl. relief ÷ predicted",
+                      "outcome_auc": "AUC", "outcome_auc_real": "AUC excl. relief"}
+        config = {"outcome_n_complete": st.column_config.NumberColumn("Loans", format="%d")}
+        config.update({c: st.column_config.NumberColumn(label, format="percent") for c, label in pct_cols.items()})
+        config.update({c: st.column_config.NumberColumn(label, format="%.2f") for c, label in ratio_cols.items()})
+        st.dataframe(summary[["vintage"] + outcome_cols].dropna(subset=["outcome_auc"]), hide_index=True,
+                     width="stretch", column_config=config)
+        if "complete_share" in summary.columns:
+            pending = summary[summary["outcome_auc"].isna()]
+            if len(pending):
+                st.caption("Outcomes pending (windows still open): " + ", ".join(
+                    f"{v} ({s:.0%} closed)" for v, s in zip(pending["vintage"], pending["complete_share"])) + ".")
     st.caption(f"Thresholds: < {warn} stable, {warn}–{alert} watch, ≥ {alert} alert. "
                "`defaultwatch monitor --fail-on-alert` exits with code 2 on an alert for schedulers.")
 

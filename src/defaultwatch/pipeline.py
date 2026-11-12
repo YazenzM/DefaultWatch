@@ -359,6 +359,7 @@ def monitor(cfg: dict, bundle: ModelBundle | None = None, vintages: list[int] | 
     train_years = set(cfg["vintages"]["train"])
     candidates = vintages or [v for v in cfg["vintages"]["monitor"] if v not in train_years]
     present = set(available_vintages(cfg))
+    min_complete_share = float(cfg["monitoring"].get("min_complete_share", 0.95))
     rows = []
     for year in candidates:
         if year not in present:
@@ -371,22 +372,32 @@ def monitor(cfg: dict, bundle: ModelBundle | None = None, vintages: list[int] | 
         result["n"] = int(len(df))
         result["mean_pd"] = float(np.mean(p))
         complete = (df["has_performance"].astype(bool) & df["window_complete"].astype(bool)).to_numpy()
-        if complete.sum() >= 100:
+        # Until (nearly) every window has closed, the "complete" loans over-represent early defaults
+        # (a loan that went bad is complete at once), so outcomes would be biased upward.
+        result["complete_share"] = float(complete.mean())
+        if complete.sum() >= 100 and complete.mean() >= min_complete_share:
             y = df.loc[complete, "bad"].astype(int).to_numpy()
             y_real = df.loc[complete, "bad_real"].astype(int).to_numpy()
+            mean_pd = float(np.mean(p[complete]))
             result["outcomes"] = {
                 "n_complete": int(complete.sum()),
                 "observed_rate": float(y.mean()),
                 "observed_real_rate": float(y_real.mean()),
-                "mean_pd_complete": float(np.mean(p[complete])),
+                "mean_pd_complete": mean_pd,
+                "observed_to_predicted": float(y.mean() / mean_pd),
+                "observed_real_to_predicted": float(y_real.mean() / mean_pd),
                 "auc": auc(y, p[complete]),
                 "auc_real": auc(y_real, p[complete]),
             }
+        elif df["has_performance"].any():
+            log.info("vintage %s: outcomes pending, %.0f%% of 24-month windows closed (need %.0f%%)",
+                     year, 100 * complete.mean(), 100 * min_complete_share)
         (reports / f"psi_{year}.json").write_text(json.dumps(_jsonable(result), indent=2))
         level = {"alert": logging.WARNING, "watch": logging.INFO}.get(result["status"], logging.INFO)
         log.log(level, "vintage %s: score PSI %.3f, status %s%s", year, result["score_psi"], result["status"].upper(),
                 f" ({', '.join(result['alerts'])})" if result["alerts"] else "")
-        row = {"vintage": year, "n": result["n"], "mean_pd": result["mean_pd"], "score_psi": result["score_psi"],
+        row = {"vintage": year, "n": result["n"], "mean_pd": result["mean_pd"],
+               "complete_share": result["complete_share"], "score_psi": result["score_psi"],
                "max_watched_psi": result["max_watched_psi"], "status": result["status"],
                "alerts": ";".join(result["alerts"]), "warnings": ";".join(result["warnings"])}
         row.update({f"psi_{c}": v for c, v in result["feature_psi"].items()})

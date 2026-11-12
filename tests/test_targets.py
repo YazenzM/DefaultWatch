@@ -36,6 +36,11 @@ def _targets():
         _rows("H_reo", [0] * 10 + ["RA"]),
         _rows("I_clean", [0] * full),
         _rows("J_unknown_status", ["", "XX"] + [0] * (full - 2)),
+        # Release 48 payment deferral: C in the month granted, P on every month after it.
+        _rows("K_deferral", [0, 0, 0, 0, 1, 2, 3] + [0] * (full - 7),
+              deferral={4: "C"} | {k: "P" for k in range(5, full)}),
+        _rows("L_prior_deferral_only", [0] * 8 + [1, 2, 3] + [0] * (full - 11),
+              deferral={2: "C"} | {k: "P" for k in range(3, full)}),
     ], ignore_index=True)
     return compute_targets(perf, CFG).set_index("loan_id")
 
@@ -59,6 +64,10 @@ def test_target_definitions():
     assert t.loc["H_reo", "bad"]
     assert not t.loc["I_clean", "bad"] and t.loc["I_clean", "window_complete"]
     assert not t.loc["J_unknown_status", "bad"]
+    # A deferral granted two months before the 90+ month is inside the lookback: relief.
+    assert t.loc["K_deferral", "bad_relief_only"]
+    # P only says a deferral happened earlier; 90+ six months later is real default.
+    assert t.loc["L_prior_deferral_only", "bad_real"]
 
 
 def test_reads_zip_and_text_layouts(tmp_path):
@@ -70,8 +79,23 @@ def test_reads_zip_and_text_layouts(tmp_path):
     a, b = read_origination(z), read_origination(t)
     assert len(a) == len(b) == 50
     assert list(a.columns[:3]) == ["credit_score", "first_payment_date", "first_time_homebuyer"]
-    assert find_source(tmp_path / "z", "svcg", 2015) is not None
+    assert (a["super_conforming"] == "N").all() and (a["vantage_score_4"] == "9999").all()
+    assert find_source(tmp_path / "z", "perf", 2015)[1] == "sample_perf_2015.txt"
+    assert find_source(tmp_path / "t", "perf", 2015)[0].name == "sample_perf_2015.txt"
     assert find_source(tmp_path / "z", "orig", 2099) is None
+
+
+def test_reads_pre_release_48_files(tmp_path):
+    """Older downloads: sample_svcg_YYYY.txt, and servicer name in origination field 25."""
+    legacy = ["700", "201503", "N", "204502", "", "0", "1", "P", "80", "36", "200000", "80", "4.0", "R", "N",
+              "FRM", "TX", "SF", "75000", "F15Q10000001", "P", "360", "1", "BANK A", "SERVICER B", "", "", "9",
+              "", "9", "N", "7"]
+    (tmp_path / "sample_orig_2015.txt").write_text("|".join(legacy) + "\n")
+    (tmp_path / "sample_svcg_2015.txt").write_text("F15Q10000001|201503|200000|0|1|359" + "|" * 26 + "\n")
+    orig = read_origination(find_source(tmp_path, "orig", 2015))
+    assert orig.loc[0, "seller_name"] == "BANK A" and orig.loc[0, "servicer_name"] == "SERVICER B"
+    assert orig.loc[0, "mi_cancellation"] == "7" and orig.loc[0, "credit_score"] == "700"
+    assert find_source(tmp_path, "perf", 2015)[0].name == "sample_svcg_2015.txt"
 
 
 def test_sentinels_become_missing():

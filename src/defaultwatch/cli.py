@@ -87,6 +87,13 @@ def publish_results(cfg: dict, dest: str | Path | None = None, allow_synthetic: 
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, target)
 
+    # A local MLflow store's path says nothing useful to readers; keep remote URIs (e.g. "databricks").
+    published = json.loads((reports / "metrics.json").read_text())
+    tracking = (published.get("mlflow") or {}).get("tracking_uri", "")
+    if tracking.startswith(("sqlite:", "file:")) or Path(tracking).is_absolute():
+        published["mlflow"]["tracking_uri"] = "local"
+        (reports / "metrics.json").write_text(json.dumps(published, indent=2))
+
     def portable(p: Path) -> str:   # repo-relative where possible, so the config works on any machine
         p = Path(p).resolve()
         return p.relative_to(REPO_ROOT).as_posix() if p.is_relative_to(REPO_ROOT) else str(p)

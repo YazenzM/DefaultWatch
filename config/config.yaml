@@ -46,6 +46,7 @@ features:
     servicer_name: "Lender identity, not an attribute of the applicant"
     property_valuation_method: "Populated only for recent vintages"
     program_indicator: "Populated only for recent vintages"
+    vantage_score_4: "Added in Release 48 but not populated (9999) for any 2014-2025 sample loan"
 
 split:
   holdout_fraction: 0.20         # stratified in-time holdout for early stopping, Platt calibration and cutoff setting
@@ -89,6 +90,7 @@ monitoring:
   psi_warn: 0.10
   psi_alert: 0.25
   top_features: 5
+  min_complete_share: 0.95       # report a vintage's outcomes only once this share of its 24-month windows has closed
 
 mlflow:
   experiment: defaultwatch                    # becomes /Shared/defaultwatch on Databricks

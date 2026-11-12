@@ -86,10 +86,27 @@ a 90+ month counts as relief if any flag appears in that month or the {cfg['targ
 
     mon = m.get("monitoring") or []
     if mon:
+        def known(x) -> bool:
+            return x is not None and x == x   # not missing / NaN
+
+        def outcome(r: dict) -> str:
+            ratio, real = r.get("outcome_observed_to_predicted"), r.get("outcome_observed_real_to_predicted")
+            if known(ratio) and known(real):
+                return f"{ratio:.2f} / {real:.2f} | {_f(r.get('outcome_auc'))}"
+            share = r.get("complete_share")
+            return (f"pending ({share:.0%} of windows closed) | " if known(share) and share > 0 else "no outcomes yet | ")
+
         mon_rows = "\n".join(
-            f"| {r['vintage']} | {_n(r['n'])} | {_f(r['score_psi'])} | {_f(r['max_watched_psi'])} | {r['status']} |"
-            for r in mon)
-        mon_table = ("| Vintage | Loans | Score PSI | Worst watched PSI | Status |\n|---|---|---|---|---|\n" + mon_rows)
+            f"| {r['vintage']} | {_n(r['n'])} | {_f(r['score_psi'])} | {_f(r['max_watched_psi'])} | {r['status']} "
+            f"| {outcome(r)} |" for r in mon)
+        mon_table = ("| Vintage | Loans | Score PSI | Worst watched PSI | Status | Observed ÷ predicted, all / excl. "
+                     "relief | AUC |\n|---|---|---|---|---|---|---|\n" + mon_rows)
+        flagged = [f"{r['vintage']} ({r['outcome_observed_real_to_predicted']:.2f})" for r in mon
+                   if known(r.get("outcome_observed_real_to_predicted"))
+                   and not 0.75 <= r["outcome_observed_real_to_predicted"] <= 1.33]
+        if flagged:
+            mon_table += ("\n\nExcluding relief, observed ÷ predicted is outside the 0.75–1.33 band for "
+                          + ", ".join(flagged) + ", which triggers review.")
     else:
         mon_table = "_No post-training vintages were available to monitor._"
 

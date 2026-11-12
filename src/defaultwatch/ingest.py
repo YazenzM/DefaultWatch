@@ -31,8 +31,11 @@ import pyarrow.csv as pacsv
 from .schema import (
     ASSISTANCE_RELIEF_CODES,
     ORIGINATION_COLUMNS,
+    PAYMENT_DEFERRAL_RELIEF_CODES,
     PERFORMANCE_COLUMNS,
+    PERFORMANCE_KINDS,
     PERFORMANCE_USECOLS,
+    origination_columns,
 )
 
 log = logging.getLogger(__name__)
@@ -63,23 +66,25 @@ def label_to_index(label: str) -> int:
 
 # --------------------------------------------------------------------------- files
 def find_source(raw_dir: str | Path, kind: str, year: int) -> Source | None:
-    """Locate the origination ("orig") or performance ("svcg") file for a vintage.
+    """Locate the origination ("orig") or monthly performance ("perf") file for a vintage.
 
-    Accepts extracted text files anywhere under raw_dir, or the zip archives as
-    downloaded from Freddie Mac (sample_YYYY.zip).
+    Accepts extracted text files anywhere under raw_dir, or the zip archives as downloaded
+    from Freddie Mac (sample_YYYY.zip). "perf" also finds the pre-Release 48 name "svcg".
     """
     raw = Path(raw_dir)
     if not raw.exists():
         return None
-    for pattern in (f"sample_{kind}_{year}.txt", f"*_{kind}_{year}.txt"):
-        hits = sorted(raw.rglob(pattern))
-        if hits:
-            return hits[0], None
+    kinds = PERFORMANCE_KINDS if kind in PERFORMANCE_KINDS else (kind,)
+    for k in kinds:
+        for pattern in (f"sample_{k}_{year}.txt", f"*_{k}_{year}.txt"):
+            hits = sorted(raw.rglob(pattern))
+            if hits:
+                return hits[0], None
     for archive in sorted(raw.rglob(f"*{year}*.zip")):
         with zipfile.ZipFile(archive) as zf:
             for name in zf.namelist():
                 base = Path(name).name
-                if base.endswith(".txt") and f"_{kind}_" in base and str(year) in base:
+                if base.endswith(".txt") and str(year) in base and any(f"_{k}_" in base for k in kinds):
                     return archive, name
     return None
 
@@ -95,17 +100,20 @@ def _open(src: Source):
             yield f
 
 
-def _column_names(src: Source, layout: list[str]) -> list[str]:
+def _first_row(src: Source) -> list[str]:
     with _open(src) as f:
-        first = f.readline().decode("latin-1").rstrip("\r\n")
-    ncols = first.count("|") + 1
+        return f.readline().decode("latin-1").rstrip("\r\n").split("|")
+
+
+def _column_names(src: Source, layout: list[str]) -> list[str]:
+    ncols = len(_first_row(src))
     if ncols <= len(layout):
         return layout[:ncols]
     return layout + [f"extra_{i}" for i in range(ncols - len(layout))]
 
 
 def read_origination(src: Source) -> pd.DataFrame:
-    names = _column_names(src, ORIGINATION_COLUMNS)
+    names = origination_columns(_first_row(src))
     with _open(src) as f:
         raw = f.read()
     df = pd.read_csv(
@@ -167,7 +175,7 @@ def compute_targets(perf: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     bad_event = (dlq >= threshold).fillna(False) | status.eq("RA") | zb.isin(default_codes)
     terminated = zb.ne("")
     relief = (
-        perf["payment_deferral"].astype(str).str.strip().str.upper().eq("Y")
+        perf["payment_deferral"].astype(str).str.strip().str.upper().isin(PAYMENT_DEFERRAL_RELIEF_CODES)
         | perf["disaster_delinquency"].astype(str).str.strip().str.upper().eq("Y")
         | perf["borrower_assistance_status"].astype(str).str.strip().str.upper().isin(ASSISTANCE_RELIEF_CODES)
     )
@@ -275,7 +283,7 @@ def prepare(cfg: dict, vintages: list[int] | None = None) -> dict[int, Path]:
         if orig_src is None:
             log.info("vintage %s: no origination file under %s, skipping", year, raw_dir)
             continue
-        perf_src = find_source(raw_dir, "svcg", year)
+        perf_src = find_source(raw_dir, "perf", year)
         loans = build_vintage(orig_src, perf_src, year, cfg)
         path = out_dir / f"loans_{year}.parquet"
         loans.to_parquet(path, index=False)
